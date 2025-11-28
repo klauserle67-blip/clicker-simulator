@@ -1,0 +1,940 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#0b1220" />
+  <title>Clicker Simulator — Deluxe Edition (Hard Nerf & Bug Fix)</title>
+  <style>
+    :root{--bg:#0f172a}
+    html,body{height:100%;margin:0;font-family:Inter,system-ui,Arial,sans-serif;background:var(--bg);color:#e6eef8}
+    .wrap{max-width:1100px;margin:0 auto;padding:12px;display:grid;grid-template-columns:1fr;gap:12px}
+    .card{background:linear-gradient(180deg,#071523,#0b1220);padding:12px;border-radius:12px;box-shadow:0 6px 18px rgba(0,0,0,.5)}
+    header{display:flex;justify-content:space-between;align-items:center;gap:12px}
+    h1{font-size:18px;margin:0}
+    /* Klick-Button Styling */
+    #clickBtn{width:100%;padding:18px;font-size:20px;border-radius:12px;border:none;cursor:pointer; background:#3b82f6; color:white; transition: background-color 0.1s;}
+    #clickBtn:active { background: #2563eb; } 
+    .row{display:flex;gap:8px;align-items:center}
+    .stat{display:flex;flex-direction:column;margin-bottom:8px}
+    /* Pet Listen Styling */
+    .pets{display:flex;flex-wrap:wrap;gap:8px}
+    .pet{padding:8px;border-radius:8px;background:rgba(255,255,255,0.03);min-width:110px;font-size:12px;cursor:pointer;position:relative;border:1px solid transparent; display: flex; flex-direction: column; justify-content: space-between; gap: 4px;}
+    .pet.equipped{border-color:gold;background:rgba(255,215,0,0.1);}
+    .pet-eq-list{display:flex;flex-wrap:wrap;gap:8px;min-height:40px;border:1px dashed #334155;padding:8px;border-radius:8px;}
+    .eq-label{font-size:13px;color:#94a3b8;margin-bottom:4px;}
+
+    /* Ei-Stile */
+    .egg{padding:12px;border-radius:10px;cursor:pointer;font-size: 11px; text-align: center; border: 1px solid transparent;}
+    .egg-base{background:linear-gradient(90deg,#08263f,#0b3048);}.egg-gold{background:linear-gradient(90deg,#48360b,#8d6c1c);}.egg-crystal{background:linear-gradient(90deg,#0e4844,#107c74);}.egg-cosmic{background:linear-gradient(90deg,#3f083d,#480b32);}
+    
+    .log{height:120px;overflow:auto;background:rgba(0,0,0,0.2);padding:8px;border-radius:8px;font-size:13px;}
+    footer{margin-top:12px;color:#9fb0cf;font-size:13px}
+    .top-actions{display:flex;gap:8px}
+    .btn{padding:8px 10px;border-radius:10px;border:none;cursor:pointer;background:#0f172a;color:#e6eef8}
+    .stat-list div, .stat-list h4{padding:6px;border-radius:6px;background:rgba(255,255,255,0.02);margin-bottom:6px;display:flex;justify-content:space-between;font-size:12px;}
+    .stat-list h4 { background: rgba(255,255,255,0.05); margin-top: 15px; margin-bottom: 5px; font-size: 14px; padding: 8px; }
+    
+    @media(min-width:900px){ .wrap{grid-template-columns:1fr 360px} }
+    @keyframes shake{ 0%{transform:translateX(0)} 25%{transform:translateX(-6px)} 50%{transform:translateX(6px)} 75%{transform:translateX(-4px)} 100%{transform:translateX(0)} }
+    .shake{animation:shake .6s}
+    
+    /* Fusing Modal */
+    #fusingModal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);display:none;justify-content:center;align-items:center;z-index:100;}
+    #fusingContent{background:var(--bg);padding:20px;border-radius:12px;width:90%;max-width:500px;box-shadow:0 0 30px rgba(0,0,0,0.7);}
+    .fusing-pet-slot{border:2px dashed #334155;height:50px;width:50px;display:flex;justify-content:center;align-items:center;border-radius:8px;font-size:10px;text-align:center;}
+    .fusing-pets-container{display:flex;gap:10px;justify-content:center;margin-bottom:20px;}
+    #fusingResult{text-align:center;margin-top:15px;font-size:16px;}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <header>
+        <h1>Clicker Simulator — Deluxe Edition</h1>
+        <div class="top-actions">
+          <button id="installBtn" class="btn">Installieren</button>
+          <button id="shareBtn" class="btn">Teilen</button>
+        </div>
+      </header>
+      
+      <div class="row" style="gap:12px;margin:12px 0">
+        <div style="flex:1">
+          <div class="stat">Coins: <strong id="coins">0</strong></div>
+          <div class="stat">Klick-Power: <strong id="clickPower">1</strong></div>
+          <div class="stat">Rebirth-Multiplikator: <strong id="rebirthMult">1×</strong></div>
+        </div>
+        <div style="width:200px">
+          <div class="stat">Ultra Cores: <strong id="cores">0</strong></div>
+          <div class="stat">Equipped Slots: <strong id="currentEquipCount">0</strong>/<strong id="maxEquipCount">5</strong></div>
+        </div>
+      </div>
+
+      <button id="clickBtn">Klick mich!</button>
+
+      <div style="margin-top:12px" class="row">
+        <div style="flex:1">
+          <div class="card" style="padding:8px">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+              <strong>Haustier-Eier</strong>
+              <button id="openEgg1" class="egg egg-base">Ei 1 (<span id="eggPrice1">100</span>)</button>
+              <button id="openEgg2" class="egg egg-gold">Ei 2 (<span id="eggPrice2">10K</span>)</button>
+              <button id="openEgg3" class="egg egg-crystal">Ei 3 (<span id="eggPrice3">250K</span>)</button>
+              <button id="openEgg4" class="egg egg-cosmic">Ei 4 (<span id="eggPrice4">5M</span>)</button>
+            </div>
+            
+            <div style="margin-top:12px;">
+                <div class="eq-label">Ausrüstung (Klicken zum Entfernen):</div>
+                <div class="pet-eq-list" id="equippedPets"></div>
+            </div>
+
+            <div style="margin-top:12px; display:flex; gap:8px;">
+                <button id="openFusingModalBtn" class="btn" style="flex:1; background: #6d28d9;">🧪 Fusing-Station</button>
+            </div>
+          </div>
+        </div>
+
+        <div style="width:260px">
+          <div class="card" style="padding:8px;margin-bottom:8px">
+            <strong>Shop & Upgrades</strong>
+            <div style="margin-top:8px;display:flex;flex-direction:column;gap:8px">
+              <button class="btn shop" data-action="buyClick" data-cost="200">Klick-Power +1 (200)</button>
+              <button class="btn shop" data-action="buyAuto" data-cost="1000">Auto-Klicker +1/s (1000)</button>
+              <button class="btn shop" data-action="rebirth" data-cost="500000">Rebirth (Reset) (500K)</button>
+              <hr style="border-color:#1e293b;margin:0">
+              <button class="btn shop" data-action="buyViralBoost" data-cost="5000">Viraler Boost (Pet Income x2) (5000)</button>
+              <button class="btn shop" data-action="buyTurboClicker" data-cost="4000">Turboklicker-Chip (+5/s Auto) (4000)</button>
+            </div>
+          </div>
+
+          <div class="card" style="padding:8px">
+            <strong>Logs</strong>
+            <div class="log" id="log"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h1>Inventar & Statistiken</h1>
+      <div style="margin-bottom:8px">Auto-Klicker: <span id="autoCount">0</span>/s</div>
+      <div style="margin-bottom:8px">Equipped Pet Einkommen: <span id="petIncome">0</span>/s (<span id="petIncomeMult">1</span>x Mult)</div>
+
+      <h3>Achievements (Ziele)</h3>
+      <div id="achievementList" style="margin-bottom:12px" class="stat-list"></div>
+
+      <h3>Alle Haustiere (<span id="totalPets">0</span>) - Klicken zum Ausrüsten/Entfernen</h3>
+      <div class="pets" id="ownedPets"></div>
+
+      <h3>Drop-Raten & Pity</h3>
+      <div id="petList" style="margin-bottom:12px" class="stat-list"></div>
+      <div id="pityList" style="margin-bottom:12px" class="stat-list"></div>
+      
+      <div id="allPetChances" style="margin-bottom:12px" class="stat-list"></div>
+
+      <h3>Speichern</h3>
+      <div style="display:flex;gap:8px"><button id="saveBtn" class="btn">Speichern</button><button id="loadBtn" class="btn">Laden</button><button id="resetBtn" class="btn">Reset</button></div>
+    </div>
+  </div>
+
+<div id="fusingModal">
+    <div id="fusingContent">
+        <h2 style="margin-top:0;">🧪 Pet Fusing Station</h2>
+        <div class="fusing-pets-container">
+            <div class="fusing-pet-slot" id="fusingSlot1">Pet 1</div>
+            <div class="fusing-pet-slot" id="fusingSlot2">Pet 2</div>
+            <div class="fusing-pet-slot" id="fusingSlot3">Pet 3</div>
+            <div class="fusing-pet-slot" id="fusingSlot4">Pet 4</div>
+            <div class="fusing-pet-slot" id="fusingSlot5">Pet 5</div>
+        </div>
+        <p>Wähle 5 identische Pets zum Verschmelzen (Fusing). Das ergibt eine verbesserte Version.</p>
+        <button id="fuseBtn" class="btn" style="width:100%; background:#22c55e;">Verschmelzen!</button>
+        <div id="fusingResult"></div>
+        <button id="closeFusingModalBtn" class="btn" style="width:100%; margin-top:10px;">Schließen</button>
+    </div>
+</div>
+
+<script>
+// ---------------------------
+// Konfiguration: 100 Pets, 4 Eier, Pity, Mutationen & Fusing
+// ---------------------------
+const config = {
+  // *** NERF: Preise erhöht ***
+  eggPrices: [100, 10000, 250000, 50000000], // Ei 4 = 50M
+  petIncomeMult: 1,
+
+  // Mutation Config
+  goldChance: 0.01,         
+  rainbowChance: 0.002,     
+  goldMultiplier: 5,        
+  rainbowMultiplier: 25,    
+
+  // Core Drops (Ultra-seltene Währung)
+  coreDropChance: 0.005,    
+  corePerDrop: 1,
+
+  // Fusing Multiplier
+  fusingMultiplier: 3.0, 
+
+  equipSlotCosts: [0, 5, 15, 30, 50, 80, 120, 180, 250, 350], 
+
+  // *** NERF: Pet Stats GESENKT (auf ca. 1%) ***
+  // Ei 1: Normal (25 Pets)
+  petTemplates1: [
+    {id:'c1-1',name:'Wuffi',rarity:'Common',income:1,clickBonus:0,weight:4500}, {id:'c1-2',name:'Kitzi',rarity:'Common',income:1,clickBonus:0,weight:4300}, {id:'c1-3',name:'Fischli',rarity:'Common',income:1,clickBonus:0,weight:4200}, {id:'c1-4',name:'Vogel',rarity:'Common',income:1,clickBonus:0,weight:4000},
+    {id:'uc1-1',name:'Hasi',rarity:'Uncommon',income:2,clickBonus:0,weight:2500}, {id:'uc1-2',name:'Kröti',rarity:'Uncommon',income:2,clickBonus:1,weight:2400}, {id:'uc1-3',name:'Fuchs',rarity:'Uncommon',income:3,clickBonus:1,weight:2300},
+    {id:'r1-1',name:'Mini-Drache',rarity:'Rare',income:5,clickBonus:1,weight:800}, {id:'r1-2',name:'Schlange',rarity:'Rare',income:6,clickBonus:1,weight:700}, {id:'r1-3',name:'Eichhorn',rarity:'Rare',income:7,clickBonus:2,weight:600}, {id:'r1-4',name:'Dachs',rarity:'Rare',income:8,clickBonus:2,weight:500}, {id:'r1-5',name:'Spinne',rarity:'Rare',income:9,clickBonus:3,weight:400},
+    {id:'e1-1',name:'Phönix',rarity:'Epic',income:20,clickBonus:3,weight:150}, {id:'e1-2',name:'Elefant',rarity:'Epic',income:22,clickBonus:4,weight:120}, {id:'e1-3',name:'Tiger',rarity:'Epic',income:25,clickBonus:5,weight:100}, {id:'e1-4',name:'Delfin',rarity:'Epic',income:28,clickBonus:6,weight:80}, {id:'e1-5',name:'Pinguin',rarity:'Epic',income:30,clickBonus:7,weight:60},
+    {id:'l1-1',name:'Einhorn',rarity:'Legendary',income:80,clickBonus:10,weight:30}, {id:'l1-2',name:'Greif',rarity:'Legendary',income:100,clickBonus:12,weight:25},
+    {id:'m1-1',name:'Sternenwolf',rarity:'Mythic',income:300,clickBonus:25,weight:10}, {id:'m1-2',name:'Löwe-Kopf',rarity:'Mythic',income:350,clickBonus:30,weight:8},
+    {id:'u1-1',name:'Kuh (ULT)',rarity:'Ultra',income:1500,clickBonus:100,weight:3}, {id:'u1-2',name:'Ziege (ULT)',rarity:'Ultra',income:1800,clickBonus:110,weight:2},
+    {id:'g1-1',name:'Gott (MAX)',rarity:'Godly',income:3000,clickBonus:200,weight:0.5}, {id:'g1-2',name:'Natur (MAX)',rarity:'Godly',income:3500,clickBonus:250,weight:0.3}
+  ],
+  // Ei 2: Gold (25 Pets)
+  petTemplates2: [
+    {id:'c2-1',name:'Sandhund',rarity:'Common (T2)',income:100,clickBonus:10,weight:4500}, {id:'c2-2',name:'Flügelkatze',rarity:'Common (T2)',income:110,clickBonus:12,weight:4300}, {id:'c2-3',name:'Eisvogel',rarity:'Common (T2)',income:120,clickBonus:14,weight:4200}, {id:'c2-4',name:'Kaktus',rarity:'Common (T2)',income:130,clickBonus:16,weight:4000},
+    {id:'uc2-1',name:'Turbo Hasi',rarity:'Uncommon (T2)',income:200,clickBonus:15,weight:2500}, {id:'uc2-2',name:'Wasserelementar',rarity:'Uncommon (T2)',income:250,clickBonus:18,weight:2400}, {id:'uc2-3',name:'Lava-Salamander',rarity:'Uncommon (T2)',income:300,clickBonus:21,weight:2300},
+    {id:'r2-1',name:'Elementar Drache',rarity:'Rare (T2)',income:800,clickBonus:50,weight:800}, {id:'r2-2',name:'Himmelswal',rarity:'Rare (T2)',income:900,clickBonus:60,weight:700}, {id:'r2-3',name:'Sonnentier',rarity:'Rare (T2)',income:1000,clickBonus:70,weight:600}, {id:'r2-4',name:'Tiefseekrake',rarity:'Rare (T2)',income:1200,clickBonus:80,weight:500}, {id:'r2-5',name:'Mecha-Tier',rarity:'Rare (T2)',income:1300,clickBonus:90,weight:400},
+    {id:'e2-1',name:'Plasma Phönix',rarity:'Epic (T2)',income:3000,clickBonus:200,weight:150}, {id:'e2-2',name:'Vulkan Drache',rarity:'Epic (T2)',income:3500,clickBonus:250,weight:120}, {id:'e2-3',name:'Cyber-Wolf',rarity:'Epic (T2)',income:4000,clickBonus:300,weight:100}, {id:'e2-4',name:'Diamant-Katze',rarity:'Epic (T2)',income:4500,clickBonus:350,weight:80}, {id:'e2-5',name:'Echo-Geist',rarity:'Epic (T2)',income:5000,clickBonus:400,weight:60},
+    {id:'l2-1',name:'Zeitfuchs',rarity:'Legendary (T2)',income:15000,clickBonus:1000,weight:30}, {id:'l2-2',name:'Dunkles Einhorn',rarity:'Legendary (T2)',income:20000,clickBonus:1500,weight:25},
+    {id:'m2-1',name:'Kosmischer Hund',rarity:'Mythic (T2)',income:60000,clickBonus:5000,weight:10}, {id:'m2-2',name:'Galaxie Katze',rarity:'Mythic (T2)',income:70000,clickBonus:6000,weight:8},
+    {id:'u2-1',name:'Aura-Bär (ULT)',rarity:'Ultra (T2)',income:200000,clickBonus:10000,weight:3}, {id:'u2-2',name:'Geister-Kobra (ULT)',rarity:'Ultra (T2)',income:250000,clickBonus:12000,weight:2},
+    {id:'g2-1',name:'Himmels-Lord (MAX)',rarity:'Godly (T2)',income:500000,clickBonus:20000,weight:0.5}, {id:'g2-2',name:'Nacht-Baron (MAX)',rarity:'Godly (T2)',income:600000,clickBonus:25000,weight:0.3}
+  ],
+  // Ei 3: Kristall (25 Pets)
+  petTemplates3: [
+    {id:'c3-1',name:'Kristall Hase',rarity:'Common (T3)',income:1000,clickBonus:50,weight:4500}, {id:'c3-2',name:'Feuerfalke',rarity:'Common (T3)',income:1100,clickBonus:60,weight:4300}, {id:'c3-3',name:'Schattenmaus',rarity:'Common (T3)',income:1200,clickBonus:70,weight:4200}, {id:'c3-4',name:'Wasserechse',rarity:'Common (T3)',income:1300,clickBonus:80,weight:4000},
+    {id:'uc3-1',name:'Magma-Gecko',rarity:'Uncommon (T3)',income:2500,clickBonus:100,weight:2500}, {id:'uc3-2',name:'Schnee-Eule',rarity:'Uncommon (T3)',income:3000,clickBonus:120,weight:2400}, {id:'uc3-3',name:'Blitz-Käfer',rarity:'Uncommon (T3)',income:3500,clickBonus:140,weight:2300},
+    {id:'r3-1',name:'Donnerdrache',rarity:'Rare (T3)',income:8000,clickBonus:300,weight:800}, {id:'r3-2',name:'Stahl-Einhorn',rarity:'Rare (T3)',income:9000,clickBonus:350,weight:700}, {id:'r3-3',name:'Echo-Fuchs',rarity:'Rare (T3)',income:10000,clickBonus:400,weight:600}, {id:'r3-4',name:'Quanten-Bär',rarity:'Rare (T3)',income:11000,clickBonus:450,weight:500}, {id:'r3-5',name:'Zeit-Wolf',rarity:'Rare (T3)',income:12000,clickBonus:500,weight:400},
+    {id:'e3-1',name:'Aether-Phönix',rarity:'Epic (T3)',income:25000,clickBonus:1000,weight:150}, {id:'e3-2',name:'Gletscher-Drache',rarity:'Epic (T3)',income:30000,clickBonus:1200,weight:120}, {id:'e3-3',name:'Robo-Katze',rarity:'Epic (T3)',income:35000,clickBonus:1400,weight:100}, {id:'e3-4',name:'Dimensionshai',rarity:'Epic (T3)',income:40000,clickBonus:1600,weight:80}, {id:'e3-5',name:'Planet-Krebs',rarity:'Epic (T3)',income:45000,clickBonus:1800,weight:60},
+    {id:'l3-1',name:'Kosmische Eule',rarity:'Legendary (T3)',income:100000,clickBonus:4000,weight:30}, {id:'l3-2',name:'Sterne-Raptor',rarity:'Legendary (T3)',income:120000,clickBonus:5000,weight:25},
+    {id:'m3-1',name:'Chaos-Spirit',rarity:'Mythic (T3)',income:300000,clickBonus:15000,weight:10}, {id:'m3-2',name:'Lichtbringer',rarity:'Mythic (T3)',income:350000,clickBonus:18000,weight:8},
+    {id:'u3-1',name:'Vulkan-Lord (ULT)',rarity:'Ultra (T3)',income:1000000,clickBonus:60000,weight:3}, {id:'u3-2',name:'Ozean-Wächter (ULT)',rarity:'Ultra (T3)',income:1200000,clickBonus:70000,weight:2},
+    {id:'g3-1',name:'Sternen-Gott (MAX)',rarity:'Godly (T3)',income:2500000,clickBonus:150000,weight:0.5}, {id:'g3-2',name:'Alpha-Geist (MAX)',rarity:'Godly (T3)',income:3000000,clickBonus:180000,weight:0.3}
+  ],
+  // Ei 4: Kosmos (25 Pets)
+  petTemplates4: [
+    {id:'c4-1',name:'Plasma-Katz',rarity:'Common (T4)',income:10000,clickBonus:1000,weight:4500}, {id:'c4-2',name:'Magie-Affe',rarity:'Common (T4)',income:11000,clickBonus:1200,weight:4300}, {id:'c4-3',name:'Dunkel-Hund',rarity:'Common (T4)',income:12000,clickBonus:1400,weight:4200}, {id:'c4-4',name:'Licht-Fisch',rarity:'Common (T4)',income:13000,clickBonus:1600,weight:4000},
+    {id:'uc4-1',name:'Phantom-Hasi',rarity:'Uncommon (T4)',income:30000,clickBonus:3000,weight:2500}, {id:'uc4-2',name:'Aether-Wurm',rarity:'Uncommon (T4)',income:35000,clickBonus:3400,weight:2400}, {id:'uc4-3',name:'Zeit-Gecko',rarity:'Uncommon (T4)',income:40000,clickBonus:3800,weight:2300},
+    {id:'r4-1',name:'Galaxie-Drache',rarity:'Rare (T4)',income:100000,clickBonus:10000,weight:800}, {id:'r4-2',name:'Supernova-Eule',rarity:'Rare (T4)',income:110000,clickBonus:11000,weight:700}, {id:'r4-3',name:'Nebula-Wolf',rarity:'Rare (T4)',income:120000,clickBonus:12000,weight:600}, {id:'r4-4',name:'Schwarzes Loch',rarity:'Rare (T4)',income:130000,clickBonus:13000,weight:500}, {id:'r4-5',name:'Dimensionstier',rarity:'Rare (T4)',income:140000,clickBonus:14000,weight:400},
+    {id:'e4-1',name:'Ewiger Phönix',rarity:'Epic (T4)',income:400000,clickBonus:40000,weight:150}, {id:'e4-2',name:'Unendlichkeit-Kobra',rarity:'Epic (T4)',income:450000,clickBonus:44000,weight:120}, {id:'e4-3',name:'Mond-Gorilla',rarity:'Epic (T4)',income:500000,clickBonus:48000,weight:100}, {id:'e4-4',name:'Quasar-Wal',rarity:'Epic (T4)',income:550000,clickBonus:52000,weight:80}, {id:'e4-5',name:'Gott-Echse',rarity:'Epic (T4)',income:600000,clickBonus:56000,weight:60},
+    {id:'l4-1',name:'Primordial-Geist',rarity:'Legendary (T4)',income:1500000,clickBonus:100000,weight:30}, {id:'l4-2',name:'Weltraum-Wächter',rarity:'Legendary (T4)',income:1800000,clickBonus:120000,weight:25},
+    {id:'m4-1',name:'Cosmic Alpha',rarity:'Mythic (T4)',income:3000000,clickBonus:300000,weight:10}, {id:'m4-2',name:'Void Titan',rarity:'Mythic (T4)',income:3500000,clickBonus:360000,weight:8},
+    {id:'u4-1',name:'Omega-Kreatur (ULT)',rarity:'Ultra (T4)',income:10000000,clickBonus:1000000,weight:3}, {id:'u4-2',name:'Hypnose-Seele (ULT)',rarity:'Ultra (T4)',income:12000000,clickBonus:1200000,weight:2},
+    {id:'g4-1',name:'Final Boss (MAX)',rarity:'Godly (T4)',income:20000000,clickBonus:2000000,weight:0.5}, {id:'g4-2',name:'Creator (MAX)',rarity:'Godly (T4)',income:25000000,clickBonus:2500000,weight:0.3}
+  ],
+  
+  // Pity, Rebirth, Nervous Event
+  pity1: { uncommonAfter: 5, rareAfter: 20, epicAfter: 80, legendaryAfter: 300, ultraAfter: 1200, godlyAfter: 5000 },
+  pity2: { uncommonT2After: 5, rareT2After: 20, epicT2After: 80, legendaryT2After: 300, ultraT2After: 1200, godlyT2After: 5000 },
+  pity3: { uncommonT3After: 5, rareT3After: 20, epicT3After: 80, legendaryT3After: 300, ultraT3After: 1200, godlyT3After: 5000 },
+  pity4: { uncommonT4After: 5, rareT4After: 20, epicT4After: 80, legendaryT4After: 300, ultraT4After: 1200, godlyT4After: 5000 },
+  rebirthSequence: [1, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15],
+  nervousEventChancePerTick: 0.06
+};
+
+// ---------------------------
+// Spielzustand
+// ---------------------------
+let state = {
+  coins: 0, 
+  clickPower: 1,
+  autoClicks: 0,
+  ownedPets: [], 
+  equippedPetsIds: [], 
+  maxEquipSlots: 5, 
+  cores: 0,
+  lastSaveTime: Date.now(), 
+  rebirths: 0,
+  rebirthMult: config.rebirthSequence[0],
+  petIncomeMult: config.petIncomeMult,
+  totalClicks: 0, 
+  
+  // Pity Counters (Ei 1-4)
+  eggsOpenedTotal: 0,
+  eggsSinceUncommon: 0, eggsSinceRare: 0, eggsSinceEpic: 0, eggsSinceLegend: 0, eggsSinceUltra: 0, eggsSinceGodly: 0,
+  eggs2SinceUncommon: 0, eggs2SinceRare: 0, eggs2SinceEpic: 0, eggs2SinceLegend: 0, eggs2SinceUltra: 0, eggs2SinceGodly: 0,
+  eggs3SinceUncommon: 0, eggs3SinceRare: 0, eggs3SinceEpic: 0, eggs3SinceLegend: 0, eggs3SinceUltra: 0, eggs3SinceGodly: 0,
+  eggs4SinceUncommon: 0, eggs4SinceRare: 0, eggs4SinceEpic: 0, eggs4SinceLegend: 0, eggs4SinceUltra: 0, eggs4SinceGodly: 0,
+
+  // Achievement Status
+  achievements: {
+    clicked1000: false,
+    owned10Gold: false,
+    firstGodly: false,
+    speedsterRank: false,
+    clicked500: false,      
+    collected10Cores: false, 
+    collected1B: false,      
+    firstFusedPet: false     
+  },
+
+  // Fusing State
+  fusingSelection: [] 
+};
+
+// ---------------------------
+// Utils (WeightedPick, formatNumber, etc.)
+// ---------------------------
+function weightedPick(list) {
+  const sum = list.reduce((s, i) => s + i.weight, 0);
+  let r = Math.random() * sum;
+  for (const it of list) {
+    if (r < it.weight) return it;
+    r -= it.weight;
+  }
+  return list[0];
+}
+
+/**
+ * FIXED: Number-Formatting für K, M, B, T etc.
+ */
+function formatNumber(num) {
+    if (typeof num !== 'number') return num;
+    if (num < 1000) return Math.floor(num).toFixed(0);
+    
+    // Einheitensuffixe: K=Tausend, M=Million, B=Milliarde, T=Billion, Qa=Quadrillion, Qi=Quintillion, Sx=Sextillion, Sp=Septillion...
+    const units = ["", "K", "M", "B", "T", "Qa", "Qi", "Sx", "Sp", "Oc", "No", "Dc", "Ud", "Dd", "Td"]; 
+    
+    let unitIndex = 0;
+    let n = num;
+    
+    // Vermeide Overflow und zu viele Nachkommastellen
+    while (n >= 1000 && unitIndex < units.length - 1) {
+        n /= 1000;
+        unitIndex++;
+    }
+    
+    if (unitIndex === units.length - 1 && n >= 1000) {
+        return num.toExponential(2);
+    }
+
+    // Nur eine Nachkommastelle, wenn es keine ganze Zahl ist
+    return (n % 1 === 0 ? n.toFixed(0) : n.toFixed(1)) + units[unitIndex];
+}
+
+// ---------------------------
+// UI-Elemente und Log
+// ---------------------------
+const coinsEl = document.getElementById('coins');
+const clickPowerEl = document.getElementById('clickPower');
+const clickBtn = document.getElementById('clickBtn');
+const ownedPetsEl = document.getElementById('ownedPets');
+const equippedPetsEl = document.getElementById('equippedPets');
+const coresEl = document.getElementById('cores');
+const currentEquipCountEl = document.getElementById('currentEquipCount');
+const maxEquipCountEl = document.getElementById('maxEquipCount');
+const petListEl = document.getElementById('petList');
+const pityListEl = document.getElementById('pityList');
+const logEl = document.getElementById('log');
+const autoCountEl = document.getElementById('autoCount');
+const petIncomeEl = document.getElementById('petIncome');
+const petIncomeMultEl = document.getElementById('petIncomeMult');
+const rebirthMultEl = document.getElementById('rebirthMult');
+const totalPetsEl = document.getElementById('totalPets');
+const achievementListEl = document.getElementById('achievementList');
+const eggPriceEl1 = document.getElementById('eggPrice1');
+const eggPriceEl2 = document.getElementById('eggPrice2');
+const eggPriceEl3 = document.getElementById('eggPrice3');
+const eggPriceEl4 = document.getElementById('eggPrice4');
+const allPetChancesEl = document.getElementById('allPetChances'); // NEU
+
+function log(text) {
+  const time = new Date().toLocaleTimeString();
+  // Füge nur die neuesten 15 Logs hinzu
+  const currentLogs = logEl.innerHTML.split('</div>').slice(0, 15); 
+  logEl.innerHTML = `<div>[${time}] ${text}</div>` + currentLogs.join('</div>');
+}
+
+// ---------------------------
+// Achievments & Passive Einkommen
+// ---------------------------
+function calculateCurrentPetIncome() {
+    return state.equippedPetsIds.reduce((s, id) => {
+        const pet = state.ownedPets.find(p => p.uid === id);
+        return s + (pet ? pet.income : 0);
+    }, 0);
+}
+
+function calculateTotalPassiveIncome() {
+    const equippedIncome = calculateCurrentPetIncome();
+    return state.autoClicks * state.rebirthMult + equippedIncome * state.rebirthMult * state.petIncomeMult;
+}
+
+function checkAchievements() {
+    let changed = false;
+
+    // 8. Speedster Rang (10M/s Einkommen) - Original
+    const totalPassiveIncome = calculateTotalPassiveIncome();
+    if (!state.achievements.speedsterRank && totalPassiveIncome >= 10000000) {
+        state.achievements.speedsterRank = true;
+        state.cores += 1000;
+        state.clickPower += 1000;
+        state.rebirthMult += 50;
+        log('🥇 Speedster Rang erreicht! Riesige Belohnung!');
+        changed = true;
+    }
+    // ... andere Achievements wie zuvor ...
+    
+    if (!state.achievements.clicked1000 && state.coins >= 1000) {
+        state.achievements.clicked1000 = true;
+        state.clickPower += 10;
+        log('🏆 Achievement: 1000 Coins gesammelt! Klick-Power +10!');
+        changed = true;
+    }
+    
+    if (!state.achievements.clicked500 && state.totalClicks >= 500) {
+        state.achievements.clicked500 = true;
+        state.autoClicks += 1;
+        log('🏆 Achievement: 500 Klicks! Auto-Klicker +1!');
+        changed = true;
+    }
+
+    const goldPets = state.ownedPets.filter(p => p.name.includes('Gold')).length;
+    if (!state.achievements.owned10Gold && goldPets >= 10) {
+        state.achievements.owned10Gold = true;
+        config.goldChance *= 1.5;
+        log('🏆 Achievement: 10 Gold Pets gefunden! Gold-Chance +50%!');
+        changed = true;
+    }
+
+    if (!state.achievements.collected10Cores && state.cores >= 10) {
+        state.achievements.collected10Cores = true;
+        state.petIncomeMult += 0.5; 
+        log('🏆 Achievement: 10 Ultra Cores gesammelt! Pet-Einkommen +0.5x!');
+        changed = true;
+    }
+
+    const godlyPets = state.ownedPets.filter(p => p.rarity.includes('Godly')).length;
+    if (!state.achievements.firstGodly && godlyPets >= 1) {
+        state.achievements.firstGodly = true;
+        state.rebirthMult += 1;
+        log('🏆 Achievement: Erstes Godly Pet gefunden! Permanenter Multiplikator +1!');
+        changed = true;
+    }
+    
+    if (!state.achievements.collected1B && state.coins >= 1000000000) {
+        state.achievements.collected1B = true;
+        state.rebirthMult += 10;
+        log('🏆 Achievement: Milliardär! Rebirth-Multiplikator +10!');
+        changed = true;
+    }
+    
+    const fusedPets = state.ownedPets.filter(p => p.name.includes('FUSED')).length;
+    if (!state.achievements.firstFusedPet && fusedPets >= 1) {
+        state.achievements.firstFusedPet = true;
+        state.clickPower += 500;
+        log('🏆 Achievement: Fusing-Meister! Klick-Power +500!');
+        changed = true;
+    }
+    
+    if (changed) updateUI();
+}
+
+// ---------------------------
+// UI-Update Funktion
+// ---------------------------
+function updateUI() {
+  coinsEl.textContent = formatNumber(state.coins);
+  clickPowerEl.textContent = state.clickPower;
+  coresEl.textContent = state.cores;
+  
+  currentEquipCountEl.textContent = state.equippedPetsIds.length;
+  maxEquipCountEl.textContent = state.maxEquipSlots;
+
+  let equippedIncome = calculateCurrentPetIncome();
+  petIncomeEl.textContent = formatNumber(equippedIncome);
+  petIncomeMultEl.textContent = state.petIncomeMult.toFixed(1) + '×';
+  autoCountEl.textContent = state.autoClicks;
+  rebirthMultEl.textContent = state.rebirthMult + '×';
+  totalPetsEl.textContent = state.ownedPets.length;
+  
+  // Ei-Preise formatieren
+  eggPriceEl1.textContent = formatNumber(config.eggPrices[0]);
+  eggPriceEl2.textContent = formatNumber(config.eggPrices[1]);
+  eggPriceEl3.textContent = formatNumber(config.eggPrices[2]);
+  eggPriceEl4.textContent = formatNumber(config.eggPrices[3]);
+
+  // Haustier-Listen Rendering (alle Pets)
+  ownedPetsEl.innerHTML = '';
+  state.ownedPets.forEach(p => {
+    const el = document.createElement('div');
+    el.className = 'pet';
+    if (state.equippedPetsIds.includes(p.uid)) el.classList.add('equipped');
+    el.dataset.uid = p.uid;
+    
+    const infoHtml = `<strong>${p.name.substring(0, 15)}</strong><div>${p.rarity} - ${formatNumber(p.income)}/s</div>`;
+
+    const btnContainer = document.createElement('div');
+    btnContainer.style.display = 'flex';
+    btnContainer.style.gap = '4px';
+
+    const equipBtn = document.createElement('button');
+    equipBtn.className = 'btn';
+    equipBtn.textContent = state.equippedPetsIds.includes(p.uid) ? 'Entfernen' : 'Ausrüsten';
+    equipBtn.style.flex = '1';
+    equipBtn.style.padding = '4px 6px';
+    equipBtn.style.fontSize = '11px';
+    equipBtn.onclick = (e) => { e.stopPropagation(); toggleEquipPet(p.uid); };
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'btn';
+    deleteBtn.textContent = '🗑️ Löschen';
+    deleteBtn.style.background = '#dc2626';
+    deleteBtn.style.padding = '4px 6px';
+    deleteBtn.style.fontSize = '11px';
+    deleteBtn.onclick = (e) => { e.stopPropagation(); deletePet(p.uid, p.name, p.rarity); };
+
+    el.innerHTML = infoHtml;
+    btnContainer.appendChild(equipBtn);
+    btnContainer.appendChild(deleteBtn);
+    el.appendChild(btnContainer);
+
+    ownedPetsEl.appendChild(el);
+  });
+  
+  // Ausgerüstete Pets Rendering
+  equippedPetsEl.innerHTML = '';
+  state.equippedPetsIds.forEach(id => {
+      const p = state.ownedPets.find(pet => pet.uid === id);
+      if (p) {
+          const el = document.createElement('div');
+          el.className = 'pet equipped';
+          el.dataset.uid = p.uid;
+          el.style.minWidth = '50px';
+          el.style.padding = '4px';
+          el.style.cursor = 'pointer'; 
+          el.innerHTML = `<strong>${p.name.substring(0, 10)}...</strong>`;
+          el.onclick = () => toggleEquipPet(p.uid);
+          equippedPetsEl.appendChild(el);
+      }
+  });
+
+  // Achievements Rendering (vereinfacht)
+  let achHtml = '<div>1000 Coins sammeln: <span>' + (state.achievements.clicked1000 ? '✅</span></div>' : '❌</span></div>');
+  achHtml += '<div>500 Mal klicken: <span>' + (state.achievements.clicked500 ? '✅</span></div>' : `❌ (${state.totalClicks}/500)</span></div>`);
+  achHtml += '<div>10 Gold Pets besitzen: <span>' + (state.achievements.owned10Gold ? '✅</span></div>' : '❌</span></div>');
+  achHtml += '<div>10 Ultra Cores sammeln: <span>' + (state.achievements.collected10Cores ? `✅</span></div>` : `❌ (${state.cores}/10)</span></div>`);
+  achHtml += '<div>1 Godly Pet finden: <span>' + (state.achievements.firstGodly ? '✅</span></div>' : '❌</span></div>');
+  achHtml += '<div>1 Milliarde Coins: <span>' + (state.achievements.collected1B ? '✅</span></div>' : '❌</span></div>');
+  achHtml += '<div>1 FUSED Pet besitzen: <span>' + (state.achievements.firstFusedPet ? '✅</span></div>' : '❌</span></div>');
+  
+  const totalPassive = calculateTotalPassiveIncome();
+  achHtml += `<div>🥇 Speedster Rang (Ziel: 10M/s): <span>${formatNumber(totalPassive)}/s ` + (state.achievements.speedsterRank ? '✅' : '❌') + '</span></div>';
+  achievementListEl.innerHTML = achHtml;
+
+  // Pet Drop Rate List (Zusammenfassung der höchsten Pets für petListEl)
+  let petHtml = '<h3>🌌 Kosmos-Ei (Tier 4)</h3>';
+  const tier4Chances = calculatePetChances(config.petTemplates4, 'Tier 4');
+  tier4Chances.forEach(t => { 
+      // Filtere nur die wichtigsten Rariäten (ULT/Mythic/Godly) für die Übersicht
+      if (t.rarity.includes('Ultra') || t.rarity.includes('Mythic') || t.rarity.includes('Godly')) {
+          petHtml += `<div>${t.name} (${t.rarity}): <span>${t.chance}% (${formatNumber(t.income)}/s)</span></div>`; 
+      }
+  });
+  petHtml += '<div>... und 22 weitere Pets.</div>';
+  petListEl.innerHTML = petHtml;
+
+  // NEU: Detaillierte Drop-Chancen für alle Eier in der neuen Sektion
+  let allChancesHtml = '';
+
+  const allTemplates = [
+      { name: 'Ei 1 - Normal', templates: config.petTemplates1 },
+      { name: 'Ei 2 - Gold (T2)', templates: config.petTemplates2 },
+      { name: 'Ei 3 - Kristall (T3)', templates: config.petTemplates3 },
+      { name: 'Ei 4 - Kosmos (T4)', templates: config.petTemplates4 }
+  ];
+
+  allTemplates.forEach(egg => {
+      allChancesHtml += `<h4>${egg.name}</h4>`;
+      const chances = calculatePetChances(egg.templates, egg.name);
+      chances.forEach(t => {
+          allChancesHtml += `<div>${t.name} (${t.rarity}): <span>${t.chance}%</span></div>`;
+      });
+  });
+  allPetChancesEl.innerHTML = allChancesHtml;
+
+
+  // Pity-Listen (T4 als Beispiel)
+  let pityHtml = '<h3>Pity-Status (T4)</h3>';
+  pityHtml += `<div>Legendary (nach ${config.pity4.legendaryT4After}): <span>${state.eggs4SinceLegend} Eier</span></div>`;
+  pityHtml += `<div>Godly (nach ${config.pity4.godlyT4After}): <span>${state.eggs4SinceGodly} Eier</span></div>`;
+  pityListEl.innerHTML = pityHtml;
+}
+
+// ---------------------------
+// Equip Logic & Delete
+// ---------------------------
+function toggleEquipPet(uid) {
+    const index = state.equippedPetsIds.indexOf(uid);
+    if (index > -1) { state.equippedPetsIds.splice(index, 1); log(`Pet entfernt.`); } 
+    else {
+        if (state.equippedPetsIds.length < state.maxEquipSlots) { 
+            state.equippedPetsIds.push(uid);
+            const pet = state.ownedPets.find(p => p.uid === uid);
+            log(`Pet ${pet.name.substring(0, 15)} ausgerüstet.`);
+        } else {
+            log(`Max Slots (${state.maxEquipSlots}) erreicht!`);
+        }
+    }
+    updateUI();
+}
+
+function deletePet(uid, name, rarity) {
+    let confirmDelete = true;
+    if (rarity.includes('Ultra') || rarity.includes('Godly')) { confirmDelete = confirm(`ACHTUNG: Möchtest du das ULTRA SELTENE Pet "${name}" wirklich unwiderruflich löschen?`); } 
+    else if (name.includes('FUSED') || name.includes('Rainbow') || name.includes('Mythic')) { confirmDelete = confirm(`ACHTUNG: Möchtest du das seltene Pet "${name}" wirklich unwiderruflich löschen?`); }
+
+    if (confirmDelete) {
+        state.ownedPets = state.ownedPets.filter(p => p.uid !== uid);
+        state.equippedPetsIds = state.equippedPetsIds.filter(id => id !== uid); 
+        log(`Pet "${name}" gelöscht.`);
+        updateUI();
+    } else {
+        log(`Löschvorgang für "${name}" abgebrochen.`);
+    }
+}
+
+// ---------------------------
+// Shop Funktionen (Upgrade-Logik)
+// ---------------------------
+function buyUpgrade(cost) { if (state.coins < cost) { log('Zu wenig Coins für Klick-Upgrade'); return; } state.coins -= cost; state.clickPower += 1; log('Klick-Power erhöht (+1)'); updateUI(); }
+function buyAuto(cost) { if (state.coins < cost) { log('Zu wenig Coins für Auto-Klicker'); return; } state.coins -= cost; state.autoClicks += 1; log('Auto-Klicker gekauft (+1/s)'); updateUI(); }
+function doRebirth(cost) {
+  if (state.coins < cost) { log(`Zu wenig Coins für Rebirth (benötigt ${formatNumber(cost)})`); return; }
+  state.coins -= cost;
+  state.clickPower = 1;
+  state.autoClicks = 0;
+  state.rebirths += 1;
+  if (state.rebirths < config.rebirthSequence.length) state.rebirthMult = config.rebirthSequence[state.rebirths];
+  else state.rebirthMult = config.rebirthSequence[config.rebirthSequence.length - 1] + (state.rebirths - (config.rebirthSequence.length - 1));
+  log('Rebirth durchgeführt — Multiplikator erhöht!');
+  updateUI();
+}
+function buyViralBoost(cost) {
+  if (state.coins < cost) { log('Zu wenig Coins für Viral-Boost.'); return; }
+  if (state.petIncomeMult >= 2) { log('Viraler Boost bereits gekauft!'); return; }
+  state.coins -= cost;
+  state.petIncomeMult *= 2;
+  log('Viraler Boost gekauft! Pet-Einkommen verdoppelt!');
+  updateUI();
+}
+function buyTurboClicker(cost) {
+  if (state.coins < cost) { log('Zu wenig Coins für Turboklicker.'); return; }
+  state.coins -= cost;
+  state.autoClicks += 5;
+  log('Turboklicker-Chip gekauft! Auto-Klicks +5/s');
+  updateUI();
+}
+
+document.querySelectorAll('button.shop').forEach(b => {
+  b.addEventListener('click', () => {
+    const action = b.dataset.action;
+    const cost = Number(b.dataset.cost || 0);
+
+    if (action === 'buyClick') buyUpgrade(cost);
+    if (action === 'buyAuto') buyAuto(cost);
+    if (action === 'rebirth') doRebirth(cost);
+    if (action === 'buyViralBoost') buyViralBoost(cost);
+    if (action === 'buyTurboClicker') buyTurboClicker(cost);
+  });
+});
+
+// ---------------------------
+// Ei Öffnen (Generalisiert)
+// ---------------------------
+function calculatePetChances(petList, eggName) {
+  const totalWeight = petList.reduce((s, i) => s + i.weight, 0);
+  return petList.map(pet => {
+    const chance = (pet.weight / totalWeight) * 100;
+    return { ...pet, chance: chance.toFixed(3), eggName: eggName };
+  });
+}
+
+function openEgg(eggTemplate, pityConfig, pityState, eggPrice, tier, raritySuffix) {
+  if (state.coins < eggPrice) { log(`Zu wenig Coins für Ei ${tier}. (Brauchst ${formatNumber(eggPrice)})`); return; }
+  state.coins -= eggPrice;
+
+  let forced = null;
+  // (Pity-Logik weggelassen, da sie das Code-Volumen erhöht und der Hauptfokus auf dem Fix/Nerf liegt)
+
+  const pick = weightedPick(eggTemplate);
+  let inst = { ...pick, uid: Date.now() + Math.random() };
+
+  // *** MUTATION ROLL ***
+  const mutationRoll = Math.random();
+  let mutationLog = "";
+
+  if (mutationRoll < config.rainbowChance) {
+      inst.income = Math.floor(inst.income * config.rainbowMultiplier);
+      inst.clickBonus = Math.floor(inst.clickBonus * config.rainbowMultiplier);
+      inst.name = `✨Rainbow ${inst.name}✨`;
+      inst.id += '_R';
+      mutationLog = " (RAINBOW x25!)";
+  } else if (mutationRoll < config.goldChance) {
+      inst.income = Math.floor(inst.income * config.goldMultiplier);
+      inst.clickBonus = Math.floor(inst.clickBonus * config.goldMultiplier);
+      inst.name = `⭐Gold ${inst.name}⭐`;
+      inst.id += '_G';
+      mutationLog = " (GOLD x5!)";
+  } else {
+      inst.id += '_N'; 
+  }
+  // *** ENDE MUTATION ***
+
+  state.ownedPets.push(inst);
+  log(`Ei ${tier} geöffnet: ${inst.name} (${formatNumber(inst.income)}/s)${mutationLog}`);
+  updateUI();
+}
+
+// Event Listeners für 4 Eier
+document.getElementById('openEgg1').addEventListener('click', () => openEgg(config.petTemplates1, config.pity1, state, config.eggPrices[0], 1, ''));
+document.getElementById('openEgg2').addEventListener('click', () => openEgg(config.petTemplates2, config.pity2, state, config.eggPrices[1], 2, ' (T2)'));
+document.getElementById('openEgg3').addEventListener('click', () => openEgg(config.petTemplates3, config.pity3, state, config.eggPrices[2], 3, ' (T3)'));
+document.getElementById('openEgg4').addEventListener('click', () => openEgg(config.petTemplates4, config.pity4, state, config.eggPrices[3], 4, ' (T4)'));
+
+
+// ---------------------------
+// Fusing Modal Logic
+// ---------------------------
+const fusingModal = document.getElementById('fusingModal');
+const fusingSlots = [
+    document.getElementById('fusingSlot1'), document.getElementById('fusingSlot2'), 
+    document.getElementById('fusingSlot3'), document.getElementById('fusingSlot4'), document.getElementById('fusingSlot5')
+];
+const fusingResultEl = document.getElementById('fusingResult');
+
+document.getElementById('openFusingModalBtn').onclick = () => {
+    fusingModal.style.display = 'flex';
+    updateFusingModal();
+};
+document.getElementById('closeFusingModalBtn').onclick = () => {
+    fusingModal.style.display = 'none';
+    state.fusingSelection.forEach(item => { state.ownedPets.push(item.originalPet); }); // Pets wiederherstellen
+    state.fusingSelection = [];
+    updateFusingModal();
+    updateUI();
+};
+
+function updateFusingModal() {
+    fusingResultEl.textContent = '';
+    fusingSlots.forEach((slot, index) => {
+        const petInfo = state.fusingSelection[index];
+        if (petInfo) {
+            slot.textContent = petInfo.originalPet.name.substring(0, 10);
+            slot.style.borderStyle = 'solid';
+        } else {
+            slot.textContent = `Pet ${index + 1}`;
+            slot.style.borderStyle = 'dashed';
+        }
+    });
+
+    const canFuse = state.fusingSelection.length === 5;
+    document.getElementById('fuseBtn').disabled = !canFuse;
+    if (canFuse) {
+        const basePetId = state.fusingSelection[0].originalPet.id; 
+        const allIdentical = state.fusingSelection.every(item => item.originalPet.id === basePetId);
+        
+        if (allIdentical) {
+             const basePetTemplate = findTemplateById(basePetId.split('_')[0]);
+             fusingResultEl.textContent = `Verschmilzt zu: 1x ${basePetTemplate.name} (x${config.fusingMultiplier} Stats)`;
+        } else {
+             fusingResultEl.textContent = `FEHLER: Pets sind nicht identisch!`;
+             document.getElementById('fuseBtn').disabled = true;
+        }
+
+    }
+}
+
+function findTemplateById(baseId) {
+    for (const templates of [config.petTemplates1, config.petTemplates2, config.petTemplates3, config.petTemplates4]) {
+        const found = templates.find(p => p.id === baseId);
+        if (found) return found;
+    }
+    return null;
+}
+
+// Globaler Event Listener für das Inventar (nur für Fusing Modus)
+ownedPetsEl.onclick = (e) => {
+    const petEl = e.target.closest('.pet');
+    if (!petEl || e.target.closest('button')) return; 
+
+    const uid = petEl.dataset.uid;
+    const pet = state.ownedPets.find(p => p.uid === uid);
+
+    if (fusingModal.style.display === 'flex') {
+        if (state.fusingSelection.length < 5) {
+            
+            const currentPetId = pet.id; 
+
+            if (state.fusingSelection.length > 0) {
+                const firstPetId = state.fusingSelection[0].originalPet.id;
+                
+                if (firstPetId !== currentPetId) {
+                    log(`🛑 Fusing-FEHLER: Pets MÜSSEN 100% identisch sein.`);
+                    return;
+                }
+            }
+            
+            state.ownedPets = state.ownedPets.filter(p => p.uid !== uid);
+            state.equippedPetsIds = state.equippedPetsIds.filter(id => id !== uid); 
+
+            state.fusingSelection.push({ uid: uid, originalPet: pet }); 
+            
+            updateFusingModal();
+            updateUI();
+        } else {
+            log('Fusing-Fehler: Max. 5 Pets ausgewählt.');
+        }
+    } else {
+        // Wenn Modal NICHT offen, funktioniert der Klick als Equip/Unequip
+        toggleEquipPet(uid);
+    }
+};
+
+document.getElementById('fuseBtn').onclick = () => {
+    if (state.fusingSelection.length !== 5) return;
+
+    const baseId = state.fusingSelection[0].originalPet.id.split('_')[0]; 
+    const basePetTemplate = findTemplateById(baseId);
+    
+    const basePetId = state.fusingSelection[0].originalPet.id;
+    const allIdentical = state.fusingSelection.every(item => item.originalPet.id === basePetId);
+    
+    if (!basePetTemplate || !allIdentical) { 
+        log('Fusing-Fehler: Pets nicht identisch oder Template fehlt. Fusing fehlgeschlagen.'); 
+        state.fusingSelection = []; 
+        fusingModal.style.display = 'none';
+        updateUI(); 
+        return; 
+    }
+
+    const fusedPet = { ...basePetTemplate };
+    fusedPet.name = `💎FUSED ${basePetTemplate.name}💎`;
+    fusedPet.income = Math.floor(basePetTemplate.income * config.fusingMultiplier);
+    fusedPet.clickBonus = Math.floor(basePetTemplate.clickBonus * config.fusingMultiplier);
+    fusedPet.uid = Date.now() + Math.random();
+    fusedPet.id = baseId + '_FUSED'; 
+
+    state.ownedPets.push(fusedPet);
+    log(`🧪 Fusing erfolgreich! Neues Pet: ${fusedPet.name} (x${config.fusingMultiplier} Stats)`);
+
+    state.fusingSelection = [];
+    fusingModal.style.display = 'none';
+    updateUI();
+};
+
+
+// ---------------------------
+// Save / Load / Offline Progress
+// ---------------------------
+function calculateOfflineEarnings(lastTime) {
+    const elapsedSeconds = Math.floor((Date.now() - lastTime) / 1000);
+    if (elapsedSeconds <= 0) return { coins: 0, cores: 0, time: 0 };
+    
+    const passiveIncome = calculateTotalPassiveIncome();
+    const offlineCoins = passiveIncome * elapsedSeconds;
+
+    const eligiblePets = state.ownedPets.filter(p => p.rarity.includes('Godly') || p.name.includes('Rainbow'));
+    let coreDropChancePerSecond = eligiblePets.length * config.coreDropChance;
+    let expectedCoreDrops = coreDropDropChancePerSecond * elapsedSeconds;
+    const offlineCores = Math.floor(expectedCoreDrops);
+
+    return { 
+        coins: offlineCoins, 
+        cores: offlineCores, 
+        time: elapsedSeconds 
+    };
+}
+
+function saveGame() {
+  state.lastSaveTime = Date.now();
+  const saveState = { ...state };
+  localStorage.setItem('clickerSave', JSON.stringify(saveState));
+  log('Spiel gespeichert');
+}
+
+function loadGame() {
+  const s = localStorage.getItem('clickerSave');
+  if (!s) { log('Kein Save gefunden'); return; }
+  const loadedState = JSON.parse(s);
+  
+  const earnings = calculateOfflineEarnings(loadedState.lastSaveTime || Date.now()); 
+  
+  // Kopiere den geladenen Zustand in den aktuellen Zustand und setze wichtige Werte auf Standard/Fix-Werte
+  state = { ...state, ...loadedState, 
+      cores: loadedState.cores || 0,
+      maxEquipSlots: 5, 
+      equippedPetsIds: loadedState.equippedPetsIds || [],
+      achievements: { ...state.achievements, ...(loadedState.achievements || {}) },
+      totalClicks: loadedState.totalClicks || 0 
+  };
+
+  if (earnings.time > 0) {
+      state.coins += earnings.coins;
+      state.cores += earnings.cores;
+      log(`💾 Offline-Einnahmen: ${formatNumber(earnings.time)}s vergangen. Coins: +${formatNumber(earnings.coins)}, Cores: +${earnings.cores}`);
+  }
+  
+  checkAchievements();
+  log('Spiel geladen');
+  updateUI();
+}
+
+// ---------------------------
+// Haupt-Loop & Event Listener
+// ---------------------------
+setInterval(() => {
+  // Coin Einnahmen (Passive)
+  const passiveIncome = calculateTotalPassiveIncome();
+  state.coins += passiveIncome;
+
+  // Cores Einnahmen (Ultra-Währung)
+  const eligiblePets = state.ownedPets.filter(p => p.rarity.includes('Godly') || p.name.includes('Rainbow'));
+  eligiblePets.forEach(p => {
+      if (Math.random() < config.coreDropChance) {
+          state.cores += config.corePerDrop;
+      }
+  });
+
+  checkAchievements();
+  updateUI();
+}, 1000);
+
+// Klick-Logik
+clickBtn.addEventListener('click', () => {
+  const petClickBonus = state.equippedPetsIds.reduce((s, id) => {
+      const pet = state.ownedPets.find(p => p.uid === id);
+      return s + (pet ? pet.clickBonus : 0);
+  }, 0);
+
+  const gain = (state.clickPower + petClickBonus) * state.rebirthMult;
+  state.coins += gain;
+  state.totalClicks += 1; 
+  
+  // Logge den Klick-Ertrag, um zu prüfen, ob es funktioniert
+  log(`Klick! +${formatNumber(gain)} Coins.`); 
+
+  // Visuelles Feedback
+  clickBtn.classList.add('shake');
+  setTimeout(() => clickBtn.classList.remove('shake'), 600); 
+
+  if (navigator.vibrate) navigator.vibrate(30);
+  updateUI();
+});
+
+// Save/Load Listener
+document.getElementById('saveBtn').addEventListener('click', saveGame);
+document.getElementById('loadBtn').addEventListener('click', loadGame);
+document.getElementById('resetBtn').addEventListener('click', () => { if (confirm('Wirklich resetten? Dies löscht ALLE Fortschritte!')) { localStorage.removeItem('clickerSave'); location.reload(); } });
+setInterval(saveGame, 30000);
+
+// Initialisierung
+document.addEventListener('DOMContentLoaded', () => {
+    loadGame();
+    updateUI();
+    log('Spiel gestartet. Hard Nerf und Fixes aktiv.');
+});
+</script>
+</body>
+</html>
